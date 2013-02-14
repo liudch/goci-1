@@ -58,7 +58,7 @@ func (cn *conn) Prepare(query string) (driver.Stmt, error) {
 	if C.OCIHandleAlloc(cn.env_handle, &stmt_handle, C.OCI_HTYPE_STMT, 0, nil) != C.OCI_SUCCESS {
 		return nil, ociGetError(cn.error_handle)
 	}
-	return &statement{}, nil
+	return &statement{handle: stmt_handle}, nil
 }
 
 func (cn *conn) Close() error {

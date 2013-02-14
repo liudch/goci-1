@@ -1,16 +1,29 @@
 package goci
 
+/*
+#include <oci.h>
+#include <stdlib.h>
+#include <string.h>
+
+#cgo pkg-config: oci8
+*/
+import "C"
 import (
 	"database/sql/driver"
+	"fmt"
+	"unsafe"
 )
 
-type statement struct{}
+type statement struct {
+	handle unsafe.Pointer
+	conn   *conn
+}
 
-func (stmt *statement) Close() (err error) {
+func (stmt *statement) Close() error {
 	return nil
 }
 
-func (stmt *statement) NumInput() (num int) {
+func (stmt *statement) NumInput() int {
 	return 0
 }
 
@@ -22,6 +35,23 @@ func (stmt *statement) Exec(v []driver.Value) (result driver.Result, err error) 
 
 // Exec executes a query that may return rows, such as a
 // SELECT.
-func (stmt *statement) Query(v []driver.Value) (_ driver.Rows, err error) {
+func (stmt *statement) Query(v []driver.Value) (driver.Rows, error) {
+	if err := stmt.bind(v); err != nil {
+		return nil, err
+	}
 	return nil, nil
+}
+
+func (stmt *statement) bind(args []driver.Value) error {
+	var binding *C.OCIBind
+	for pos, value := range args {
+		buffer := []byte(fmt.Sprint("%v", value))
+		buffer = append(buffer, 0)
+		result := C.OCIBindByPos((*C.OCIStmt)(stmt.handle), &binding, (*C.OCIError)(stmt.conn.error_handle), C.ub4(pos+1),
+			unsafe.Pointer(&buffer[0]), C.sb4(len(buffer)), C.SQLT_STR, nil, nil, nil, 0, nil, C.OCI_DEFAULT)
+		if result != C.OCI_SUCCESS {
+			return ociGetError(stmt.conn.error_handle)
+		}
+	}
+	return nil
 }
