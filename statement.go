@@ -94,11 +94,11 @@ func (stmt *statement) Query(v []driver.Value) (rows driver.Rows, err error) {
 		C.OCIAttrGet(param, C.OCI_DTYPE_PARAM, unsafe.Pointer(&colName), &nameSize, C.OCI_ATTR_NAME, (*C.OCIError)(stmt.conn.err))
 		C.OCIAttrGet(param, C.OCI_DTYPE_PARAM, unsafe.Pointer(&colSize), nil, C.OCI_ATTR_DATA_SIZE, (*C.OCIError)(stmt.conn.err))
 
-    column.kind = int(colType)
-    column.size = int(colSize)
-    column.name = C.GoStringN(colName, (C.int)(nameSize))
-    fmt.Println(column)
-    //column.raw = make([]byte, int(colSize))
+		column.kind = int(colType)
+		column.size = int(colSize)
+		column.name = C.GoStringN(colName, (C.int)(nameSize))
+		fmt.Println(column)
+		//column.raw = make([]byte, int(colSize))
 	}
 	return
 }
@@ -107,7 +107,7 @@ type column struct {
 	name string
 	kind int
 	size int
-	raw []byte
+	raw  []byte
 }
 
 func (stmt *statement) bind(args []driver.Value) error {
