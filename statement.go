@@ -11,6 +11,7 @@ import "C"
 import (
 	"database/sql/driver"
 	"fmt"
+	"log"
 	"unsafe"
 )
 
@@ -24,7 +25,11 @@ func (stmt *statement) Close() error {
 }
 
 func (stmt *statement) NumInput() int {
-	return 0
+	var num C.int
+	if r := C.OCIAttrGet(stmt.handle, C.OCI_HTYPE_STMT, unsafe.Pointer(&num), nil, C.OCI_ATTR_BIND_COUNT, (*C.OCIError)(stmt.conn.err)); r != C.OCI_SUCCESS {
+		log.Println(ociGetError(stmt.conn.err))
+	}
+	return int(num)
 }
 
 // Exec executes a query that doesn't return rows, such

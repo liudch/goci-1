@@ -1,22 +1,28 @@
 package goci_test
 
 import (
-	_ "github.com/egravert/goci"
 	"database/sql"
+	_ "github.com/egravert/goci"
 	"os"
 	"testing"
 )
 
-func TestCanQueryDb(t *testing.T) {
+func TestStatements(t *testing.T) {
 	dsn := os.Getenv("ORACLE_DSN")
 	db, err := sql.Open("goci", dsn)
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer db.Close()
 
-	_, err = db.Query("SELECT 'goci' FROM dual")
+	stmt, err := db.Prepare("SELECT 1 FROM dual")
 	if err != nil {
 		t.Fatal(err)
 	}
-  
+
+	_, err = stmt.Query()
+	if err != nil {
+		t.Fatal(err)
+	}
+  //defer rows.Close()
 }
