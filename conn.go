@@ -58,6 +58,12 @@ func (conn *connection) Prepare(query string) (driver.Stmt, error) {
 	if C.OCIHandleAlloc(conn.env, &stmt, C.OCI_HTYPE_STMT, 0, nil) != C.OCI_SUCCESS {
 		return nil, ociGetError(conn.err)
 	}
+	result := C.OCIStmtPrepare((*C.OCIStmt)(stmt), (*C.OCIError)(conn.err),
+		(*C.OraText)(unsafe.Pointer(pquery)), C.ub4(C.strlen(pquery)),
+		C.ub4(C.OCI_NTV_SYNTAX), C.ub4(C.OCI_DEFAULT))
+	if result != C.OCI_SUCCESS {
+		return nil, ociGetError(conn.err)
+	}
 	return &statement{handle: stmt, conn: conn}, nil
 }
 

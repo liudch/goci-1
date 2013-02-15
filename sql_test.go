@@ -15,7 +15,7 @@ func TestStatements(t *testing.T) {
 	}
 	defer db.Close()
 
-	stmt, err := db.Prepare("SELECT 1 FROM dual")
+	stmt, err := db.Prepare("SELECT cast(1 as int) as foo, 3.14 as bar, 'goci' as baz FROM dual")
 	if err != nil {
 		t.Fatal(err)
 	}
