@@ -14,68 +14,68 @@ import (
 	"unsafe"
 )
 
-type conn struct {
-	env_handle    unsafe.Pointer
-	error_handle  unsafe.Pointer
-	server_handle unsafe.Pointer
+type connection struct {
+	env unsafe.Pointer
+	err unsafe.Pointer
+	svr unsafe.Pointer
 }
 
-func (cn *conn) performLogon(dsn string) error {
+func (conn *connection) performLogon(dsn string) error {
 
 	user, pwd, host := parseDsn(dsn)
-	c_user := C.CString(user)
-	defer C.free(unsafe.Pointer(c_user))
-	c_pwd := C.CString(pwd)
-	defer C.free(unsafe.Pointer(c_pwd))
-	c_host := C.CString(host)
-	defer C.free(unsafe.Pointer(c_host))
+	puser := C.CString(user)
+	defer C.free(unsafe.Pointer(puser))
+	ppwd := C.CString(pwd)
+	defer C.free(unsafe.Pointer(ppwd))
+	phost := C.CString(host)
+	defer C.free(unsafe.Pointer(phost))
 
-	result := C.OCILogon2((*C.OCIEnv)(unsafe.Pointer(cn.env_handle)),
-		(*C.OCIError)(cn.error_handle),
-		(**C.OCIServer)(unsafe.Pointer(&cn.server_handle)),
-		(*C.OraText)(unsafe.Pointer(c_user)),
-		C.ub4(C.strlen(c_user)),
-		(*C.OraText)(unsafe.Pointer(c_pwd)),
-		C.ub4(C.strlen(c_pwd)),
-		(*C.OraText)(unsafe.Pointer(c_host)),
-		C.ub4(C.strlen(c_host)),
+	result := C.OCILogon2((*C.OCIEnv)(unsafe.Pointer(conn.env)),
+		(*C.OCIError)(conn.err),
+		(**C.OCIServer)(unsafe.Pointer(&conn.svr)),
+		(*C.OraText)(unsafe.Pointer(puser)),
+		C.ub4(C.strlen(puser)),
+		(*C.OraText)(unsafe.Pointer(ppwd)),
+		C.ub4(C.strlen(ppwd)),
+		(*C.OraText)(unsafe.Pointer(phost)),
+		C.ub4(C.strlen(phost)),
 		C.OCI_LOGON2_STMTCACHE)
 	if result != C.OCI_SUCCESS {
-		return ociGetError(cn.error_handle)
+		return ociGetError(conn.err)
 	}
 	return nil
 }
 
-func (cn *conn) Begin() (driver.Tx, error) {
+func (conn *connection) Begin() (driver.Tx, error) {
 	return nil, nil
 }
 
-func (cn *conn) Prepare(query string) (driver.Stmt, error) {
+func (conn *connection) Prepare(query string) (driver.Stmt, error) {
 	pquery := C.CString(query)
 	defer C.free(unsafe.Pointer(pquery))
-	var stmt_handle unsafe.Pointer
+	var stmt unsafe.Pointer
 
-	if C.OCIHandleAlloc(cn.env_handle, &stmt_handle, C.OCI_HTYPE_STMT, 0, nil) != C.OCI_SUCCESS {
-		return nil, ociGetError(cn.error_handle)
+	if C.OCIHandleAlloc(conn.env, &stmt, C.OCI_HTYPE_STMT, 0, nil) != C.OCI_SUCCESS {
+		return nil, ociGetError(conn.err)
 	}
-	return &statement{handle: stmt_handle}, nil
+	return &statement{handle: stmt, conn: conn}, nil
 }
 
-func (cn *conn) Close() error {
+func (conn *connection) Close() error {
 	return nil
 }
 
 // Makes a lightweight call to the server. A successful result indicates the server is active.  A block indicates the connection may be in use by
 // another thread. A failure indicates a communication error.
-func (cn *conn) ping() error {
-	if C.OCIPing((*C.OCIServer)(cn.server_handle), (*C.OCIError)(cn.error_handle), C.OCI_DEFAULT) != C.OCI_SUCCESS {
-		return ociGetError(cn.error_handle)
+func (conn *connection) ping() error {
+	if C.OCIPing((*C.OCIServer)(conn.svr), (*C.OCIError)(conn.err), C.OCI_DEFAULT) != C.OCI_SUCCESS {
+		return ociGetError(conn.err)
 	}
 	return nil
 }
 
 // expect the dsn in the format of: user/pwd@host:port/SID
-func parseDsn(dsn string) (user string, pwd string, host string) {
+func parseDsn(dsn string) (user, pwd, host string) {
 	tokens := strings.SplitN(dsn, "@", 2)
 	if len(tokens) > 1 {
 		host = tokens[1]
@@ -85,5 +85,5 @@ func parseDsn(dsn string) (user string, pwd string, host string) {
 		pwd = userpass[1]
 	}
 	user = userpass[0]
-	return user, pwd, host
+	return
 }

@@ -22,26 +22,26 @@ func init() {
 }
 
 func (d *drv) Open(dsn string) (driver.Conn, error) {
-	cn := &conn{}
+	conn := &connection{}
 
 	// initialize the oci environment used for all other oci calls
-	result := C.OCIEnvCreate((**C.OCIEnv)(unsafe.Pointer(&cn.env_handle)), C.OCI_DEFAULT, nil, nil, nil, nil, 0, nil)
+	result := C.OCIEnvCreate((**C.OCIEnv)(unsafe.Pointer(&conn.env)), C.OCI_DEFAULT, nil, nil, nil, nil, 0, nil)
 	if result != C.OCI_SUCCESS {
 		return nil, errors.New("Failed: OCIEnvCreate()")
 	}
 
 	// error handle
-	result = C.OCIHandleAlloc(cn.env_handle, &cn.error_handle, C.OCI_HTYPE_ERROR, 0, nil)
+	result = C.OCIHandleAlloc(conn.env, &conn.err, C.OCI_HTYPE_ERROR, 0, nil)
 	if result != C.OCI_SUCCESS {
 		return nil, errors.New("Failed: OCIHandleAlloc() - creating error handle")
 	}
 
 	// Log in the user
-	err := cn.performLogon(dsn)
+	err := conn.performLogon(dsn)
 	if err != nil {
 		return nil, err
 	}
-	return cn, nil
+	return conn, nil
 }
 
 func ociGetError(err unsafe.Pointer) error {

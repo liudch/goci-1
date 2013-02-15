@@ -33,7 +33,7 @@ func TestCanConnect(t *testing.T) {
 	}
 
 	db, _ := driver.Open(dsn)
-	if err := db.(*conn).ping(); err != nil {
+	if err := db.(*connection).ping(); err != nil {
 		t.Fatal(err)
 	}
 }
