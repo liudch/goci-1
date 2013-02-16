@@ -18,9 +18,17 @@ import (
 type statement struct {
 	handle unsafe.Pointer
 	conn   *connection
+	closed bool
 }
 
 func (stmt *statement) Close() error {
+	if stmt.closed {
+		return nil
+	}
+	stmt.closed = true
+	C.OCIHandleFree(stmt.handle, C.OCI_HTYPE_STMT)
+	stmt.handle = nil
+
 	return nil
 }
 
@@ -34,8 +42,15 @@ func (stmt *statement) NumInput() int {
 
 // Exec executes a query that doesn't return rows, such
 // as an INSERT or UPDATE.
-func (stmt *statement) Exec(v []driver.Value) (driver.Result, error) {
-	return nil, nil
+func (stmt *statement) Exec(args []driver.Value) (driver.Result, error) {
+	if err := stmt.bind(args); err != nil {
+		return nil, err
+	}
+
+	if C.OCIStmtExecute((*C.OCIServer)(stmt.conn.svr), (*C.OCIStmt)(stmt.handle), (*C.OCIError)(stmt.conn.err), 1, 0, nil, nil, C.OCI_DEFAULT) != C.OCI_SUCCESS {
+		return nil, ociGetError(stmt.conn.err)
+	}
+	return &result{stmt}, nil
 }
 
 // Exec executes a query that may return rows, such as SELECT.
@@ -98,11 +113,11 @@ func (stmt *statement) Query(v []driver.Value) (driver.Rows, error) {
 		col.kind = int(colType)
 		col.size = int(colSize)
 		col.name = C.GoStringN(colName, (C.int)(nameSize))
-		col.raw = make([]byte, int(colSize))
+		col.raw = make([]byte, int(colSize+1))
 
 		var def *C.OCIDefine
 		result := C.OCIDefineByPos((*C.OCIStmt)(stmt.handle), &def, (*C.OCIError)(stmt.conn.err),
-			C.ub4(pos+1), unsafe.Pointer(&col.raw[0]), C.sb4(colSize), C.SQLT_CHR, nil, nil, nil, C.OCI_DEFAULT)
+			C.ub4(pos+1), unsafe.Pointer(&col.raw[0]), C.sb4(colSize+1), C.SQLT_CHR, nil, nil, nil, C.OCI_DEFAULT)
 		if result != C.OCI_SUCCESS {
 			return nil, ociGetError(stmt.conn.err)
 		}

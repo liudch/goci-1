@@ -5,6 +5,7 @@ import (
 	_ "github.com/egravert/goci"
 	"os"
 	"testing"
+  "fmt"
 )
 
 func TestStatements(t *testing.T) {
@@ -20,9 +21,17 @@ func TestStatements(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = stmt.Query()
+	rows, err := stmt.Query()
 	if err != nil {
 		t.Fatal(err)
 	}
-  //defer rows.Close()
+
+	var item1, item2, item3 string
+  fmt.Println("here")
+	for rows.Next() {
+		rows.Scan(&item1, &item2, &item3)
+		fmt.Println(item1, item2, item3)
+	}
+
+	defer rows.Close()
 }

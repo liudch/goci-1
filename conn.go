@@ -46,8 +46,20 @@ func (conn *connection) performLogon(dsn string) error {
 	return nil
 }
 
+func (conn *connection) exec(cmd string) error {
+  stmt, err := conn.Prepare(cmd)
+  if err == nil {
+    defer stmt.Close()
+    _, err = stmt.Exec(nil)
+  }
+  return err
+}
+
 func (conn *connection) Begin() (driver.Tx, error) {
-	return nil, nil
+  if err := conn.exec("BEGIN"); err != nil {
+    return nil, err
+  }
+  return &transaction{conn}, nil
 }
 
 func (conn *connection) Prepare(query string) (driver.Stmt, error) {

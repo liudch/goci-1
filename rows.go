@@ -1,7 +1,17 @@
 package goci
 
+/*
+#include <oci.h>
+#include <stdlib.h>
+#include <string.h>
+
+#cgo pkg-config: oci8
+*/
+import "C"
 import (
 	"database/sql/driver"
+	"io"
+  "fmt"
 )
 
 type rows struct {
@@ -24,7 +34,7 @@ func (r *rows) Columns() []string {
 
 // Close closes the rows iterator.
 func (r *rows) Close() error {
-	return nil
+  return r.stmt.Close()
 }
 
 // Next is called to populate the next row of data into
@@ -37,5 +47,19 @@ func (r *rows) Close() error {
 //
 // Next should return io.EOF when there are no more rows.
 func (r *rows) Next(dest []driver.Value) error {
+	rv := C.OCIStmtFetch2((*C.OCIStmt)(r.stmt.handle), (*C.OCIError)(r.stmt.conn.err), 1, C.OCI_FETCH_NEXT, 1, C.OCI_DEFAULT)
+  if rv == C.OCI_ERROR {
+    err :=  ociGetError(r.stmt.conn.err)
+    fmt.Println(err)
+    return ociGetError(r.stmt.conn.err)
+  }
+  if rv == C.OCI_NO_DATA {
+    fmt.Println("no data")
+    return io.EOF
+  }
+	
+  for i := range dest {
+    dest[i] = string(r.columns[i].raw)
+  }
 	return nil
 }
