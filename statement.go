@@ -39,9 +39,9 @@ func (stmt *statement) Exec(v []driver.Value) (driver.Result, error) {
 }
 
 // Exec executes a query that may return rows, such as SELECT.
-func (stmt *statement) Query(v []driver.Value) (rows driver.Rows, err error) {
-	if err = stmt.bind(v); err != nil {
-		return
+func (stmt *statement) Query(v []driver.Value) (driver.Rows, error) {
+	if err := stmt.bind(v); err != nil {
+		return nil, err
 	}
 
 	// determine the type of statement.  For select statements iter is set to zero, for other statements, only execute once.
@@ -62,22 +62,23 @@ func (stmt *statement) Query(v []driver.Value) (rows driver.Rows, err error) {
 
 	// execute the statement
 	if C.OCIStmtExecute((*C.OCIServer)(stmt.conn.svr), (*C.OCIStmt)(stmt.handle), (*C.OCIError)(stmt.conn.err), iter, 0, nil, nil, C.OCI_DEFAULT) != C.OCI_SUCCESS {
-		err = ociGetError(stmt.conn.err)
+		err := ociGetError(stmt.conn.err)
 		log.Println(err)
-		return
+		return nil, err
 	}
 
 	// find out how many output columns there are
 	var cols C.ub2
 	if C.OCIAttrGet(stmt.handle, C.OCI_HTYPE_STMT, unsafe.Pointer(&cols), nil, C.OCI_ATTR_PARAM_COUNT, (*C.OCIError)(stmt.conn.err)) != C.OCI_SUCCESS {
-		err = ociGetError(stmt.conn.err)
+		err := ociGetError(stmt.conn.err)
 		log.Println(err)
-		return
+		return nil, err
 	}
 
 	// build column meta-data
 	columns := make([]column, int(cols))
-	for pos, column := range columns {
+	for pos := 0; pos < int(cols); pos++ {
+		col := &columns[pos]
 		var param unsafe.Pointer
 		var colType C.ub2
 		var colSize C.ub4
@@ -85,22 +86,29 @@ func (stmt *statement) Query(v []driver.Value) (rows driver.Rows, err error) {
 		var nameSize C.ub4
 
 		if C.OCIParamGet(stmt.handle, C.OCI_HTYPE_STMT, (*C.OCIError)(stmt.conn.err), (*unsafe.Pointer)(unsafe.Pointer(&param)), C.ub4(pos+1)) != C.OCI_SUCCESS {
-			err = ociGetError(stmt.conn.err)
+			err := ociGetError(stmt.conn.err)
 			log.Println(err)
-			return
+			return nil, err
 		}
 
 		C.OCIAttrGet(param, C.OCI_DTYPE_PARAM, unsafe.Pointer(&colType), nil, C.OCI_ATTR_DATA_TYPE, (*C.OCIError)(stmt.conn.err))
 		C.OCIAttrGet(param, C.OCI_DTYPE_PARAM, unsafe.Pointer(&colName), &nameSize, C.OCI_ATTR_NAME, (*C.OCIError)(stmt.conn.err))
 		C.OCIAttrGet(param, C.OCI_DTYPE_PARAM, unsafe.Pointer(&colSize), nil, C.OCI_ATTR_DATA_SIZE, (*C.OCIError)(stmt.conn.err))
 
-		column.kind = int(colType)
-		column.size = int(colSize)
-		column.name = C.GoStringN(colName, (C.int)(nameSize))
-		fmt.Println(column)
-		//column.raw = make([]byte, int(colSize))
+		col.kind = int(colType)
+		col.size = int(colSize)
+		col.name = C.GoStringN(colName, (C.int)(nameSize))
+		col.raw = make([]byte, int(colSize))
+
+		var def *C.OCIDefine
+		result := C.OCIDefineByPos((*C.OCIStmt)(stmt.handle), &def, (*C.OCIError)(stmt.conn.err),
+			C.ub4(pos+1), unsafe.Pointer(&col.raw[0]), C.sb4(colSize), C.SQLT_CHR, nil, nil, nil, C.OCI_DEFAULT)
+		if result != C.OCI_SUCCESS {
+			return nil, ociGetError(stmt.conn.err)
+		}
 	}
-	return
+
+	return &rows{stmt, columns}, nil
 }
 
 type column struct {

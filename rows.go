@@ -4,14 +4,22 @@ import (
 	"database/sql/driver"
 )
 
-type rows struct{}
+type rows struct {
+	stmt    *statement
+	columns []column
+}
 
 // Columns returns the names of the columns. The number of
 // columns of the result is inferred from the length of the
 // slice.  If a particular column name isn't known, an empty
 // string should be returned for that entry.
-func (r *rows) Columns() (columns []string) {
-	return nil
+func (r *rows) Columns() []string {
+	names := make([]string, len(r.columns))
+	for pos, column := range r.columns {
+		names[pos] = column.name
+	}
+	return names
+
 }
 
 // Close closes the rows iterator.
